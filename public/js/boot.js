@@ -101,7 +101,7 @@ net.onEvent = (ev) => {
   if (!world && !ui) return;
   const fx = world ? world.fx : null;
   switch (ev.ev) {
-    case 'dmg': if (fx) fx.damage(ev.dst, ev.amount, ev.crit); break;
+    case 'dmg': if (fx) fx.damage(ev.dst, ev.amount, ev.crit, ev.label, ev.src); break;
     case 'proj': if (fx) fx.projectile(ev.src, ev.dst, ev.kind); break;
     case 'die': if (fx) fx.die(ev.id); break;
     case 'lvlup':
@@ -139,10 +139,8 @@ $('auto-btn').addEventListener('click', () => {
 const SLOT_KEYS = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 };
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab') {
-    if (!loginVisible() && !isTyping() && world) { e.preventDefault(); world.cycleTarget(); }
-    return;
-  }
+  // Tab targeting is bound inside world3d (it skips form fields); don't double-bind here.
+  if (e.key === 'Tab') return;
   if (e.key === 'Enter') {
     if (loginVisible()) return; // login-name input owns its own Enter
     const ci = $('chat-input');
