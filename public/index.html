@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WORLDSPIRE</title>
+<link rel="stylesheet" href="./css/style.css">
+<script type="importmap">
+{"imports":{"three":"./js/vendor/three.module.js"}}
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="nameplates"></div>
+<div id="dmgnums"></div>
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <div class="login-panel">
+    <h1 class="game-title">WORLDSPIRE</h1>
+    <p class="game-subtitle">A browser MMO forged in shadow &amp; steel</p>
+    <div class="login-field">
+      <label for="login-name">Hero Name</label>
+      <input id="login-name" type="text" maxlength="16" placeholder="2–16 letters or numbers" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="class-row">
+      <div class="class-card selected" data-cls="warrior">
+        <div class="cc-icon">⚔️</div>
+        <div class="cc-name">Warrior</div>
+        <div class="cc-desc">A stalwart of the front line.<br>Heavy steel, unbreakable guard, brutal close strikes.</div>
+        <div class="cc-abilities">
+          <span title="Strike">⚔️</span><span title="Charge">💨</span><span title="Shield Block">🛡️</span><span title="Whirlwind">🌪️</span>
+        </div>
+      </div>
+      <div class="class-card" data-cls="mage">
+        <div class="cc-icon">🔮</div>
+        <div class="cc-name">Mage</div>
+        <div class="cc-desc">Weaver of raw arcane power.<br>Devastating spells from afar — fragile, but none hit harder.</div>
+        <div class="cc-abilities">
+          <span title="Fireball">🔥</span><span title="Frostbolt">❄️</span><span title="Blink">✨</span><span title="Arcane Explosion">💥</span>
+        </div>
+      </div>
+      <div class="class-card" data-cls="ranger">
+        <div class="cc-icon">🏹</div>
+        <div class="cc-name">Ranger</div>
+        <div class="cc-desc">Silent hunter of the wilds.<br>Swift and precise, striking from the shadows at long range.</div>
+        <div class="cc-abilities">
+          <span title="Steady Shot">🏹</span><span title="Multi-Shot">🎯</span><span title="Disengage">💨</span><span title="Volley">🌧️</span>
+        </div>
+      </div>
+    </div>
+    <button id="login-btn">ENTER WORLD</button>
+    <div id="login-err"></div>
+    <p class="login-hint">WASD to move · 1–4 abilities · Tab target · Click enemy to attack</p>
+  </div>
+</div>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="player-frame" class="frame">
+    <div class="pf-head"><span id="pf-name">—</span><span id="pf-level">1</span></div>
+    <div id="hp-bar" class="bar"><div id="hp-fill"></div><span id="hp-text" class="bar-text">—</span></div>
+    <div id="mp-bar" class="bar"><div id="mp-fill"></div><span id="mp-text" class="bar-text">—</span></div>
+  </div>
+
+  <div id="target-frame" class="frame hidden">
+    <div class="pf-head"><span id="tf-name">—</span><span id="tf-level">?</span></div>
+    <div id="tf-hp-bar" class="bar"><div id="tf-hp-fill"></div><span id="tf-hp-text" class="bar-text">—</span></div>
+  </div>
+
+  <div id="top-right">
+    <div id="coins" title="Coins">🪙 0</div>
+    <button id="settings-btn" title="Settings">⚙</button>
+  </div>
+
+  <div id="settings-panel" class="hidden">
+    <h3>Settings</h3>
+    <label>Graphics quality
+      <select id="set-quality">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+    </label>
+    <p class="note">Anti-aliasing changes apply after reload.</p>
+  </div>
+
+  <div id="err-toast" class="hidden"></div>
+
+  <div id="castbar" class="hidden">
+    <div id="cast-label">Casting</div>
+    <div id="cast-track"><div id="cast-fill"></div></div>
+  </div>
+
+  <div id="xpbar"><div id="xp-fill"></div><span id="xp-text">—</span></div>
+
+  <div id="actionbar">
+    <div id="hotbar"></div>
+    <button id="auto-btn" title="Auto-attack ON">⚔️</button>
+  </div>
+
+  <div id="chat">
+    <div id="chat-log"></div>
+    <input id="chat-input" type="text" maxlength="140" placeholder="Press Enter to chat…" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div id="death-overlay" class="hidden">
+    <div class="death-inner">
+      <h2>YOU DIED</h2>
+      <p>The spire claims another soul…</p>
+      <button id="respawn-btn">RESPAWN AT VILLAGE</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./js/boot.js"></script>
+</body>
+</html>
