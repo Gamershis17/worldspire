@@ -806,11 +806,11 @@ export function initWorld(canvas, net) {
                     (ent.ownerName || '') + '|' + (ent.casting ? ent.casting.label : '') + '|' + isAfk + '|' + (ent.afkMsg || '');
         if (p.sig !== sig) {
           p.sig = sig;
-          // WoW-style: <GM>Name in gold, guild name in smaller text underneath;
+          // WoW-style: <GM>Name in blue, guild name in smaller text underneath;
           // tamed pets show "<Owner>'s Pet". AFK players get a grey <AFK> tag.
           p.name.textContent = isPet ? `${ent.ownerName}'s Pet`
             : (elite ? '★ ' : '') + (isGM ? '<GM>' : '') + ent.name + '  ' + (ent.level || 1) + (isAfk ? ' <AFK>' : '');
-          p.name.style.color = isGM ? '#ffd75e' : isAfk ? '#9a9a9a' : '';
+          p.name.style.color = isGM ? '#5aa9ff' : isAfk ? '#9a9a9a' : '';
           p.name.title = isAfk ? (ent.afkMsg || 'Away from keyboard') : '';
           p.guild.textContent = gname;
           p.fill.style.background = isPet ? '#8fd694' : isGM ? '#ffd75e' : ent.kind === 'player' ? '#5f5' : elite ? '#fa0' : '#f55';

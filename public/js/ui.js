@@ -240,7 +240,7 @@ export function initUI({ net, world, state }) {
 
     // player frame
     $('pf-name').textContent = (me.gm ? '<GM> ' : '') + (me.name || '—');
-    $('pf-name').style.color = me.gm ? '#ffd75e' : '';
+    $('pf-name').style.color = me.gm ? '#5aa9ff' : '';
     $('pf-level').textContent = me.level || 1;
     const cm = CLASS_MEDAL[me.cls] || CLASS_MEDAL.warrior;
     if (medalSig !== me.cls) {
