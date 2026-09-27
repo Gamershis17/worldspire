@@ -146,7 +146,7 @@ body { font-family: "Segoe UI", Verdana, sans-serif; color: var(--parchment); us
   border-radius: 10px; padding: 1px 8px; font-weight: 700;
 }
 
-#player-frame { position: absolute; top: 14px; left: 14px; }
+#player-frame { position: absolute; top: 14px; left: 14px; pointer-events: auto; cursor: pointer; }
 #target-frame { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); }
 #pet-frame { position: absolute; top: 128px; left: 14px; }
 #pet-name { color: #e8c46a; font-size: 13px; }

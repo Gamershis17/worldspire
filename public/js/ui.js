@@ -160,6 +160,12 @@ export function initUI({ net, world, state }) {
 
   // ---- wiring (once) ----
   $('respawn-btn').addEventListener('click', () => net.respawn());
+  // Clicking your own portrait frame targets yourself (F1 does the same).
+  const pf = $('player-frame');
+  pf.title = 'Target self (F1)';
+  pf.addEventListener('click', () => {
+    if (state.me) { state.targetId = state.me.id; net.target(state.me.id); }
+  });
   $('settings-btn').addEventListener('click', () => $('settings-panel').classList.toggle('hidden'));
   $('char-btn').addEventListener('click', () => $('char-panel').classList.toggle('hidden'));
   $('ach-btn').addEventListener('click', () => { renderAch(true); $('ach-panel').classList.toggle('hidden'); });
@@ -233,7 +239,7 @@ export function initUI({ net, world, state }) {
     const now = performance.now();
 
     // player frame
-    $('pf-name').textContent = me.name || '—';
+    $('pf-name').textContent = (me.gm ? '<GM> ' : '') + (me.name || '—');
     $('pf-name').style.color = me.gm ? '#ffd75e' : '';
     $('pf-level').textContent = me.level || 1;
     const cm = CLASS_MEDAL[me.cls] || CLASS_MEDAL.warrior;

@@ -534,9 +534,14 @@ export function initWorld(canvas, net) {
   }
   if (renderer) { applyQuality(); window.addEventListener('resize', onResize); }
 
-  // ---- input: pointer-lock mouse look + click targeting
+  // ---- input: WoW-style click targeting + right-hold mouse look
   const raycaster = new THREE.Raycaster();
-  let downPos = null, downLocked = false;
+  let downPos = null;
+  // Single place that changes the target (clicks, F1, portrait, Escape).
+  function setTarget(id) {
+    state.targetId = id;
+    net.target(id);
+  }
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
   });
@@ -545,26 +550,38 @@ export function initWorld(canvas, net) {
     yaw -= (e.movementX || 0) * 0.003;
     pitch = Math.max(-0.1, Math.min(1.0, pitch + (e.movementY || 0) * 0.003));
   });
+  // Right-click is camera control: never show the browser context menu over the game.
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('mousedown', e => {
+    if (e.button === 2) {
+      // Right-hold: mouse-look. Pointer lock engages while held, released on mouseup.
+      try { canvas.requestPointerLock(); } catch (err) { /* ignore */ }
+      return;
+    }
+    if (e.button !== 0) return; // ignore middle/wheel button
     downPos = [e.clientX, e.clientY];
-    downLocked = document.pointerLockElement === canvas;
   });
   canvas.addEventListener('mouseup', e => {
-    const wasLocked = downLocked;
+    if (e.button === 2) {
+      // End of right-drag mouse-look.
+      try { if (document.pointerLockElement === canvas) document.exitPointerLock(); } catch (err) { /* ignore */ }
+      return;
+    }
+    if (e.button !== 0) return;
     const dx = downPos ? e.clientX - downPos[0] : 99;
     const dy = downPos ? e.clientY - downPos[1] : 99;
     downPos = null;
     if (!renderer || !state.me) return;
-    if (!wasLocked) {
-      // First click just captures the mouse (WoW-style mouse look); no targeting.
-      try { canvas.requestPointerLock(); } catch (err) { /* ignore */ }
-      return;
-    }
+    if (document.pointerLockElement === canvas) return; // right-drag in progress: left clicks do nothing
     if (Math.hypot(dx, dy) > 6) return; // it was a drag, not a click
-    // Pointer is locked: pick whatever is under the crosshair (screen center).
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    // Left-click: raycast from the actual cursor position. The local player is
+    // never in the raycast set, so you can never target yourself by clicking.
+    // A miss (ground/sky/nothing) clears the target. Targeting never attacks.
+    const rect = canvas.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera({ x: nx, y: ny }, camera);
     const roots = [];
-    if (local.inst) roots.push(local.inst.group);
     for (const rec of models.values()) roots.push(rec.inst.group);
     const hits = raycaster.intersectObjects(roots, true);
     let id = null;
@@ -573,14 +590,24 @@ export function initWorld(canvas, net) {
       while (o && o.userData.entId === undefined) o = o.parent;
       if (o) id = o.userData.entId;
     }
-    state.targetId = id; // miss (ground/sky) clears the target
-    net.target(id);
+    setTarget(id);
   });
   window.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return;
-    // don't steal Tab from chat inputs / form fields
+    // don't steal keys from chat inputs / form fields
     const t = e.target;
-    if (t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    const typing = t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+    if (e.key === 'F1') {
+      e.preventDefault(); // don't open browser help
+      if (state.me) setTarget(state.me.id); // self-target
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (typing) return; // same press blurs chat (boot.js); don't clear the target too
+      if (state.me) setTarget(null);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    if (typing) return;
     e.preventDefault();
     api.cycleTarget();
   });
@@ -600,8 +627,7 @@ export function initWorld(canvas, net) {
       return { x: p.x, y: 2.1, z: p.z };
     }
     const rec = models.get(id);
-    if (rec) return { x: rec.inst.rx, y: rec.kind === 'player' ? 2.1 : 1.3, z: rec.inst.rz };
-    const ent = state.ents.get(id);
+    if (rec) return { x: rec.inst.rx, y: rec.kind === 'player' ? 2.1 : 1.3, z: rec.inst.rz };    const ent = state.ents.get(id);
     if (ent) return { x: ent.x, y: 2.0, z: ent.z };
     return null;
   }
