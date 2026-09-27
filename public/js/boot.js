@@ -183,9 +183,19 @@ window.addEventListener('appinstalled', () => {
 const _wsParam = new URLSearchParams(location.search).get('ws');
 const _wsScheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
 const WS_URL = _wsParam || (location.host ? _wsScheme + location.host + '/ws' : 'ws://localhost:3001/ws');
-net.connect(WS_URL).catch(() => {
-  $('login-err').textContent = 'Could not reach the game server. Is it running?';
-});
+let _wsTries = 0;
+function connectWS() {
+  net.connect(WS_URL).then(() => {
+    _wsTries = 0;
+    if ($('login-err').textContent.startsWith('Could not reach')) $('login-err').textContent = '';
+  }).catch(() => {
+    _wsTries++;
+    // Server may be mid-deploy/restart (Render) — keep retrying with backoff.
+    $('login-err').textContent = 'Could not reach the game server — retrying…';
+    setTimeout(connectWS, Math.min(3000 * _wsTries, 15000));
+  });
+}
+connectWS();
 
 net.onHello = (me) => {
   $('login').classList.add('hidden');
