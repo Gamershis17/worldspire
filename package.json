@@ -1,1 +1,20 @@
-{"dependencies":{"express":"^4.19.2","pg":"^8.23.0","ws":"^8.17.1"},"description":"WORLDSPIRE — browser MMO RPG (phase 1)","engines":{"node":">=18"},"main":"server/server.js","name":"worldspire","private":true,"scripts":{"dev":"node server/server.js","start":"node server/server.js"},"type":"module","version":"0.2.0"}
+{
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.23.0",
+    "ws": "^8.17.1"
+  },
+  "description": "WORLDSPIRE — browser MMO RPG (phase 1)",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "server/server.js",
+  "name": "worldspire",
+  "private": true,
+  "scripts": {
+    "dev": "node server/server.js",
+    "start": "node server/server.js"
+  },
+  "type": "module",
+  "version": "0.2.1"
+}

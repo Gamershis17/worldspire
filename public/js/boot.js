@@ -123,6 +123,59 @@ function tryLogin() {
 $('login-btn').addEventListener('click', tryLogin);
 $('login-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
 
+// ---------- PWA install ----------
+// Android/desktop Chrome fire beforeinstallprompt; iOS never does, so the
+// buttons there show the "Share → Add to Home Screen" fallback text.
+let deferredPrompt = null;
+const installBtns = [$('install-btn'), $('install-btn2')];
+const installHints = [$('install-hint'), $('install-hint2')];
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function showInstallUI(withPrompt) {
+  if (isStandalone) return; // already installed
+  installBtns.forEach((b) => b && b.classList.remove('hidden'));
+  if (!withPrompt && isIOS) {
+    installHints.forEach((h) => {
+      if (h) { h.textContent = 'On iPhone/iPad: Share → Add to Home Screen to install.'; h.classList.remove('hidden'); }
+    });
+  }
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallUI(true);
+});
+// If the browser supports install prompts, beforeinstallprompt fires soon
+// after load; iOS users get the fallback text right away.
+if (!isStandalone) {
+  if (isIOS) showInstallUI(false);
+  setTimeout(() => { if (!deferredPrompt && !isIOS) showInstallUI(false); }, 4000);
+}
+async function doInstall(btnIdx) {
+  if (deferredPrompt) {
+    const p = deferredPrompt;
+    deferredPrompt = null;
+    p.prompt();
+    await p.userChoice.catch(() => {});
+    installBtns.forEach((b) => b && b.classList.add('hidden'));
+  } else {
+    // No install prompt available (e.g. iOS, or criteria not met): explain.
+    const h = installHints[btnIdx];
+    if (h) {
+      h.textContent = isIOS
+        ? 'On iPhone/iPad: Share → Add to Home Screen to install.'
+        : 'Use your browser menu → "Install WORLDSPIRE" (or Add to Home Screen).';
+      h.classList.remove('hidden');
+    }
+  }
+}
+installBtns.forEach((b, i) => b && b.addEventListener('click', () => doInstall(i)));
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  installBtns.forEach((b) => b && b.classList.add('hidden'));
+  installHints.forEach((h) => h && h.classList.add('hidden'));
+});
+
 // ---------- net wiring ----------
 // WS endpoint: ?ws= override, else same-host, else localhost dev fallback
 // (file:// testing has no host). Scheme follows the page protocol so the

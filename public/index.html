@@ -4,9 +4,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>WORLDSPIRE</title>
-<link rel="stylesheet" href="./css/style.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0d0b08">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WORLDSPIRE">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="./css/style.css?v=__APP_VERSION__">
+<script>
+// PWA: register the service worker (version injected by the server).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('[pwa] SW registration failed:', e));
+  });
+}
+</script>
 <script type="importmap">
-{"imports":{"three":"./js/vendor/three.module.js"}}
+{"imports":{
+  "three":"./js/vendor/three.module.js",
+  "./js/ach.js":"./js/ach.js?v=__APP_VERSION__",
+  "./js/boot.js":"./js/boot.js?v=__APP_VERSION__",
+  "./js/merge.js":"./js/merge.js?v=__APP_VERSION__",
+  "./js/net.js":"./js/net.js?v=__APP_VERSION__",
+  "./js/state.js":"./js/state.js?v=__APP_VERSION__",
+  "./js/ui.js":"./js/ui.js?v=__APP_VERSION__",
+  "./js/world3d.js":"./js/world3d.js?v=__APP_VERSION__"
+}}
 </script>
 </head>
 <body>
@@ -61,6 +85,8 @@
       <div class="preview-wrap"><canvas id="char-preview"></canvas></div>
     </div>
     <button id="login-btn">ENTER WORLD</button>
+    <button id="install-btn" class="hidden">📲 Install app</button>
+    <p id="install-hint" class="login-hint hidden"></p>
     <div id="login-err"></div>
     <p class="login-hint">WASD to move · 1–4 abilities · Tab target · Click enemy to attack</p>
   </div>
@@ -125,6 +151,9 @@
     <p class="note">Anti-aliasing changes apply after reload.</p>
     <h3>Equipment</h3>
     <div id="gear-line" class="note">Weapon: — · Armor: —</div>
+    <h3>App</h3>
+    <button id="install-btn2" class="hidden">📲 Install app</button>
+    <p id="install-hint2" class="note hidden"></p>
   </div>
 
   <div id="err-toast" class="hidden"></div>
@@ -155,6 +184,6 @@
   </div>
 </div>
 
-<script type="module" src="./js/boot.js"></script>
+<script type="module" src="./js/boot.js?v=__APP_VERSION__"></script>
 </body>
 </html>

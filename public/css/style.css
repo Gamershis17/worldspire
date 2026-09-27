@@ -126,6 +126,18 @@ body { font-family: "Segoe UI", Verdana, sans-serif; color: var(--parchment); us
 }
 #login-btn:hover { filter: brightness(1.12); }
 #login-btn:active { transform: translateY(2px); }
+#install-btn {
+  display: block; margin: 12px auto 0; font-family: Georgia, serif; font-size: 15px;
+  letter-spacing: 2px; color: var(--gold-hi); background: transparent;
+  border: 1px solid #6e5514; border-radius: 8px; padding: 9px 26px; cursor: pointer;
+}
+#install-btn:hover { background: rgba(201,162,39,.12); }
+#install-btn2 {
+  font-family: Georgia, serif; font-size: 14px; color: var(--gold-hi);
+  background: transparent; border: 1px solid #6e5514; border-radius: 6px;
+  padding: 8px 18px; cursor: pointer; margin-top: 4px;
+}
+#install-btn2:hover { background: rgba(201,162,39,.12); }
 #login-err { min-height: 22px; color: var(--blood-hi); font-size: 14px; margin-top: 10px; }
 .login-hint { color: #6f6450; font-size: 12px; margin-top: 6px; }
 
