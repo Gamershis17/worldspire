@@ -21,11 +21,13 @@ const PRECACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  // skipWaiting runs even if precaching fails: a failed precache must never
+  // wedge the new worker in "waiting" and keep serving stale game code.
   event.waitUntil(
     caches.open(CACHE_VERSION)
       .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
       .catch((e) => console.warn('[sw] precache failed:', e))
+      .then(() => self.skipWaiting())
   );
 });
 
