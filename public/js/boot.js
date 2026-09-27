@@ -317,11 +317,18 @@ function stepMovement(dt) {
     lastDir = { x: wx, z: wz };
   }
 
-  // RECONCILIATION: the server is authoritative — snap back on big drift.
+  // RECONCILIATION: the server is authoritative, but snapshots arrive ~1 RTT
+  // stale, so while actively steering we trust our prediction (client speed is
+  // synced from the server) instead of hard-snapping to old data — otherwise
+  // normal latency looks like constant rubber-banding. Genuine divergence
+  // (teleport, respawn, summon) still hard-corrects; small drift eases out.
   const snap = state.ents.get(me.id);
   if (snap) {
-    const drift = Math.hypot(snap.x - me.x, snap.z - me.z);
-    if (drift > 1.5) { me.x = snap.x; me.z = snap.z; }
+    const dx = snap.x - me.x, dz = snap.z - me.z;
+    const drift = Math.hypot(dx, dz);
+    if (drift > 6) { me.x = snap.x; me.z = snap.z; } // teleport / respawn / summon
+    else if (len === 0 && drift > 1.5) { me.x = snap.x; me.z = snap.z; } // drifted while idle
+    else if (drift > 0.02) { const k = Math.min(1, dt * 6); me.x += dx * k; me.z += dz * k; } // ease latency offset
     if (Math.abs((snap.y || 0) - me.y) > 2) me.y = snap.y || 0;
   }
 }
