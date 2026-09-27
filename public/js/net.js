@@ -44,7 +44,7 @@ export const net = {
         break;
       }
       case 'ev': {
-        if (d.ev === 'chat') pushChat(d.from, d.text, d.sys);
+        if (d.ev === 'chat') pushChat(d.from, d.text, d.sys, d.gm, d.guild, d.emote);
         if (this.onEvent) this.onEvent(d);
         break;
       }
@@ -54,8 +54,8 @@ export const net = {
   },
 
   send(o) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(o)); },
-  login(name, cls) { this.send({ op: 'login', name, cls }); },
-  move(mx, mz, heading) { this.send({ op: 'move', mx, mz, heading }); },
+  login(name, cls, appearance) { this.send({ op: 'login', name, cls, appearance }); },
+  move(mx, mz, heading, y) { this.send({ op: 'move', mx, mz, heading, y }); },
   target(id) { this.send({ op: 'target', id }); },
   auto(on) { this.send({ op: 'auto', on }); },
   cast(slot) { this.send({ op: 'cast', slot }); },

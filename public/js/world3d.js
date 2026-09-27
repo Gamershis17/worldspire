@@ -60,6 +60,7 @@ function ensureCss() {
 .ws-plate{position:absolute;left:0;top:0;text-align:center;font:11px system-ui,sans-serif;
  color:#fff;text-shadow:0 1px 2px #000,0 0 3px #000;white-space:nowrap}
 .wp-name{font-weight:600}
+.wp-guild{color:#8fd694;font-size:10px;line-height:1.2;min-height:0}
 .wp-bar{width:58px;height:6px;background:rgba(0,0,0,.55);border:1px solid rgba(0,0,0,.8);
  margin:1px auto 0;border-radius:2px}
 .wp-fill{height:100%;border-radius:1px}
@@ -136,6 +137,105 @@ function addClouds(items) {
 }
 
 // ---------------------------------------------------------------- character templates
+// Appearance palettes (indices mirror server/data.js APPEARANCE). Also drives the
+// creation-screen swatches via the exported APPEARANCE_UI.
+export const APPEARANCE_UI = {
+  skins: [0xf2c89b, 0xe0aa7e, 0xc98a5e, 0xa06a42, 0x7a4e2e, 0x5c3a24],
+  skinNames: ['Fair', 'Tan', 'Bronze', 'Brown', 'Dark', 'Deep'],
+  hairColors: [0x2b2b2b, 0x5d3f24, 0xb0653a, 0xd9a441, 0x8c8c8c, 0xa02828],
+  hairColorNames: ['Black', 'Brown', 'Auburn', 'Blond', 'Grey', 'Red'],
+  faceNames: ['Stern', 'Heavy Brow', 'Scarred', 'War Paint'],
+  hairStyleNames: ['Bald', 'Short', 'Long', 'Mohawk'],
+};
+export const DEFAULT_APPEARANCE_UI = { skin: 1, face: 0, hairStyle: 1, hairColor: 1 };
+function sanitizeApp(a) {
+  const d = DEFAULT_APPEARANCE_UI;
+  if (!a || typeof a !== 'object') return { ...d };
+  const iv = (v, max, fb) => (Number.isInteger(v) && v >= 0 && v < max ? v : fb);
+  return {
+    skin: iv(a.skin, APPEARANCE_UI.skins.length, d.skin),
+    face: iv(a.face, APPEARANCE_UI.faceNames.length, d.face),
+    hairStyle: iv(a.hairStyle, APPEARANCE_UI.hairStyleNames.length, d.hairStyle),
+    hairColor: iv(a.hairColor, APPEARANCE_UI.hairColors.length, d.hairColor),
+  };
+}
+const appSig = (a) => `${a.skin}|${a.face}|${a.hairStyle}|${a.hairColor}`;
+
+// Apply a sanitized appearance to an instantiated player: skin tone, hair
+// style + color, face variant. Updates material c0 so death grey-out restores
+// the appearance colors.
+export function applyAppearance(inst, app) {
+  const a = sanitizeApp(app);
+  const skinHex = APPEARANCE_UI.skins[a.skin];
+  const hairHex = APPEARANCE_UI.hairColors[a.hairColor];
+  inst.group.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.userData.skin) {
+      o.material.color.setHex(skinHex);
+      o.material.userData.c0 = skinHex;
+    } else if (o.userData.hair !== undefined) {
+      const show = o.userData.hair === a.hairStyle;
+      o.visible = show;
+      if (show) { o.material.color.setHex(hairHex); o.material.userData.c0 = hairHex; }
+    } else if (o.userData.face !== undefined) {
+      o.visible = o.userData.face === a.face;
+    }
+  });
+  inst.group.userData.appSig = appSig(a);
+}
+
+// Hair styles (head-local coords; head box is 0.34 x 0.36 x 0.32).
+function buildHairMeshes() {
+  const defs = [
+    null, // 0 = bald
+    [{ geom: prim('box', 0.38, 0.13, 0.36), y: 0.225 }],                                    // 1 short
+    [{ geom: prim('box', 0.38, 0.13, 0.36), y: 0.225 },                                     // 2 long
+     { geom: prim('box', 0.38, 0.55, 0.12), y: -0.08, z: -0.2 }],
+    [{ geom: prim('box', 0.1, 0.3, 0.38), y: 0.32 }],                                       // 3 mohawk
+  ];
+  return defs.map((parts, i) => {
+    if (!parts) return null;
+    const m = new THREE.Mesh(mergeGeoms(parts.map((p) => ({ ...p, color: 0xffffff }))),
+      new THREE.MeshLambertMaterial({ color: 0x5d3f24 }));
+    m.userData.hair = i;
+    m.visible = false;
+    return m;
+  });
+}
+
+// Face variants (face front z = 0.16; eyes dark, extras colored).
+function buildFaceMeshes() {
+  const EYE = 0x141414;
+  const defs = [
+    [ // 0 stern: standard eyes
+      { geom: prim('box', 0.06, 0.05, 0.03), x: -0.08, y: 0.03, z: 0.165, color: EYE },
+      { geom: prim('box', 0.06, 0.05, 0.03), x: 0.08, y: 0.03, z: 0.165, color: EYE },
+    ],
+    [ // 1 heavy brow: narrower eyes + brow ridge
+      { geom: prim('box', 0.07, 0.04, 0.03), x: -0.09, y: 0.0, z: 0.165, color: EYE },
+      { geom: prim('box', 0.07, 0.04, 0.03), x: 0.09, y: 0.0, z: 0.165, color: EYE },
+      { geom: prim('box', 0.11, 0.03, 0.02), x: -0.085, y: 0.1, z: 0.165, color: 0x3a2a1a },
+      { geom: prim('box', 0.11, 0.03, 0.02), x: 0.085, y: 0.1, z: 0.165, color: 0x3a2a1a },
+    ],
+    [ // 2 scarred: standard eyes + scar slash
+      { geom: prim('box', 0.06, 0.05, 0.03), x: -0.08, y: 0.03, z: 0.165, color: EYE },
+      { geom: prim('box', 0.06, 0.05, 0.03), x: 0.08, y: 0.03, z: 0.165, color: EYE },
+      { geom: prim('box', 0.035, 0.24, 0.015), x: 0.07, y: 0.0, z: 0.168, color: 0x8a3030 },
+    ],
+    [ // 3 war paint: paint band + eyes
+      { geom: prim('box', 0.32, 0.09, 0.015), x: 0, y: 0.02, z: 0.166, color: 0x28304a },
+      { geom: prim('box', 0.06, 0.05, 0.03), x: -0.08, y: 0.03, z: 0.172, color: EYE },
+      { geom: prim('box', 0.06, 0.05, 0.03), x: 0.08, y: 0.03, z: 0.172, color: EYE },
+    ],
+  ];
+  return defs.map((parts, i) => {
+    const m = new THREE.Mesh(mergeGeoms(parts), lamVC());
+    m.userData.face = i;
+    m.visible = false;
+    return m;
+  });
+}
+
 const CLASS_COLORS = {
   warrior: { torso: 0x8a8f98, trim: 0xa02828, legs: 0x565b64, skin: 0xe0aa7e },
   mage:    { torso: 0x2b3fa0, trim: 0x8fb8ff, legs: 0x2b3fa0, skin: 0xe0aa7e, robe: true },
@@ -155,18 +255,27 @@ function buildPlayerTemplate(cls) {
   ]);
   body.add(new THREE.Mesh(torsoGeo, lamVC()));
 
-  const head = new THREE.Mesh(
-    mergeGeoms([{ geom: prim('box', 0.34, 0.36, 0.32), color: C.skin }]), lamVC());
-  head.position.y = 1.86; body.add(head);
+  const headG = new THREE.Group(); headG.name = 'head'; headG.position.y = 1.86; body.add(headG);
+  const headMesh = new THREE.Mesh(prim('box', 0.34, 0.36, 0.32),
+    new THREE.MeshLambertMaterial({ color: C.skin }));
+  headMesh.userData.skin = true;
+  headG.add(headMesh);
+  for (const hm of buildHairMeshes()) if (hm) headG.add(hm);
+  for (const fm of buildFaceMeshes()) headG.add(fm);
 
-  const armGeo = mergeGeoms([
+  const armSleeveGeo = mergeGeoms([
     { geom: prim('box', 0.17, 0.62, 0.2), y: -0.31, color: C.torso },
-    { geom: prim('box', 0.15, 0.16, 0.17), y: -0.68, color: C.skin },
   ]);
+  const handGeo = prim('box', 0.15, 0.16, 0.17);
+  const mkHand = () => {
+    const h = new THREE.Mesh(handGeo, new THREE.MeshLambertMaterial({ color: C.skin }));
+    h.position.y = -0.68; h.userData.skin = true;
+    return h;
+  };
   const armL = new THREE.Group(); armL.name = 'armL'; armL.position.set(-0.38, 1.56, 0);
-  armL.add(new THREE.Mesh(armGeo, lamVC())); body.add(armL);
+  armL.add(new THREE.Mesh(armSleeveGeo, lamVC())); armL.add(mkHand()); body.add(armL);
   const armR = new THREE.Group(); armR.name = 'armR'; armR.position.set(0.38, 1.56, 0);
-  armR.add(new THREE.Mesh(armGeo, lamVC())); body.add(armR);
+  armR.add(new THREE.Mesh(armSleeveGeo, lamVC())); armR.add(mkHand()); body.add(armR);
 
   const legGeo = mergeGeoms([{ geom: prim('box', 0.22, 0.95, 0.24), y: -0.475, color: C.legs }]);
   const legL = new THREE.Group(); legL.name = 'legL'; legL.position.set(-0.15, 0.95, 0);
@@ -253,13 +362,16 @@ function getTemplate(kind, sub) {
 }
 
 // Clone a template for one entity: fresh materials (so death grey-out is per-entity),
-// rig pivots re-collected by name.
-function instantiate(kind, sub) {
+// rig pivots re-collected by name. A `tint` hex color bakes a slight tint into the
+// base colors (used for tamed pets).
+function instantiate(kind, sub, tint) {
   const g = getTemplate(kind, sub).clone(true);
   const mats = [];
+  const tc = tint ? new THREE.Color(tint) : null;
   g.traverse(o => {
     if (o.isMesh) {
       o.material = o.material.clone();
+      if (tc) o.material.color.lerp(tc, 0.35); // slight golden tint for pets
       o.material.userData.c0 = o.material.color.getHex();
       o.material.userData.e0 = o.material.emissive ? o.material.emissive.getHex() : 0;
       mats.push(o.material);
@@ -268,7 +380,7 @@ function instantiate(kind, sub) {
   return {
     group: g, mats,
     rig: {
-      body: g.getObjectByName('body'),
+      body: g.getObjectByName('body'), head: g.getObjectByName('head'),
       armL: g.getObjectByName('armL'), armR: g.getObjectByName('armR'),
       legL: g.getObjectByName('legL'), legR: g.getObjectByName('legR'),
     },
@@ -346,10 +458,10 @@ export function initWorld(canvas, net) {
     const d = document.createElement('div');
     d.className = 'ws-plate';
     d.style.display = 'none';
-    d.innerHTML = '<div class="wp-name"></div><div class="wp-bar"><div class="wp-fill"></div></div><div class="wp-cast"></div>';
+    d.innerHTML = '<div class="wp-name"></div><div class="wp-guild"></div><div class="wp-bar"><div class="wp-fill"></div></div><div class="wp-cast"></div>';
     platesEl.appendChild(d);
-    plates.push({ el: d, name: d.children[0], fill: d.children[0].nextSibling.firstChild,
-                  cast: d.children[2], sig: '', used: false });
+    plates.push({ el: d, name: d.children[0], guild: d.children[1],
+                  fill: d.children[2].firstChild, cast: d.children[3], sig: '', used: false });
   }
 
   // ---- damage-number pool
@@ -504,19 +616,67 @@ export function initWorld(canvas, net) {
   }
 
   // ---- animation
-  function animateRig(rec, moving, dead, dt) {
+  // emote: null | 'dance' | 'sit' | 'sleep' | 'lol' | 'joke' (server-authoritative via snap/stats)
+  function animateRig(rec, moving, dead, dt, emote) {
     const inst = rec.inst || rec; // local uses bare inst
     const r = inst.rig;
+    // track emote changes: reset one-shot offsets when an emote ends
+    if (inst._emPrev !== (emote || null)) {
+      inst._emPrev = emote || null;
+      inst.emoteT = 0;
+      if (!emote) {
+        if (r.body) { r.body.rotation.x = 0; }
+        if (r.head) { r.head.rotation.x = 0; }
+        if (r.armL) r.armL.rotation.z = 0;
+        if (r.armR) r.armR.rotation.z = 0;
+      }
+    }
+    if (emote) inst.emoteT = (inst.emoteT || 0) + dt;
+    const et = inst.emoteT || 0;
+    // dance spins the whole figure
+    if (emote === 'dance' && !dead) inst.emoteSpin = (inst.emoteSpin || 0) + dt * 2.4;
+    else if (inst.emoteSpin) inst.emoteSpin = Math.max(0, inst.emoteSpin - dt * 6);
+
     if (moving && !dead) inst.walkPhase += dt * 9;
     const sw = (moving && !dead) ? Math.sin(inst.walkPhase) * 0.55 : 0;
     const k = Math.min(1, dt * 12);
-    if (r.armL) r.armL.rotation.x += (sw - r.armL.rotation.x) * k;
-    if (r.armR) r.armR.rotation.x += (-sw - r.armR.rotation.x) * k;
-    if (r.legL) r.legL.rotation.x += (-sw - r.legL.rotation.x) * k;
-    if (r.legR) r.legR.rotation.x += (sw - r.legR.rotation.x) * k;
+    // default targets (walk/idle), overridden by emotes below
+    let tArmL = sw, tArmR = -sw, tLegL = -sw, tLegR = sw, tBodyY = 0, tBodyRX = 0;
+    if (emote && !dead) {
+      if (emote === 'dance') {
+        const b = Math.sin(et * 8);
+        tBodyY = Math.abs(b) * 0.12;      // rhythmic bounce
+        tArmL = b * 0.95; tArmR = -b * 0.95; // alternating arm swings
+        tLegL = -b * 0.3; tLegR = b * 0.3;
+      } else if (emote === 'sit') {
+        tBodyY = -0.45;                   // lowered seated pose
+        tLegL = -1.45; tLegR = -1.45;     // folded legs
+        tArmL = -0.3; tArmR = -0.3;
+      } else if (emote === 'sleep') {
+        tBodyRX = -1.35;                  // lying flat on the back
+        tBodyY = -0.55;
+        tArmL = -0.15; tArmR = -0.15; tLegL = 0; tLegR = 0;
+      } else if (emote === 'lol') {
+        const j = Math.sin(et * 14);
+        tBodyY = Math.abs(j) * 0.045;     // body shake
+        tArmL = -0.9 + j * 0.12; tArmR = -0.9 - j * 0.12; // hands toward belly
+        if (r.head) r.head.rotation.x = j * 0.28; // head bob
+      } else if (emote === 'joke') {
+        const bow = Math.sin(Math.min(1, et / 3) * Math.PI); // flourish bow over ~3 s
+        tBodyRX = bow * 0.65;
+        tArmL = -bow * 0.4; tArmR = -bow * 0.4;
+        if (r.armL) r.armL.rotation.z += ((bow * 1.1) - r.armL.rotation.z) * k; // arms sweep out
+        if (r.armR) r.armR.rotation.z += ((-bow * 1.1) - r.armR.rotation.z) * k;
+      }
+    }
+    if (r.armL) r.armL.rotation.x += (tArmL - r.armL.rotation.x) * k;
+    if (r.armR) r.armR.rotation.x += (tArmR - r.armR.rotation.x) * k;
+    if (r.legL) r.legL.rotation.x += (tLegL - r.legL.rotation.x) * k;
+    if (r.legR) r.legR.rotation.x += (tLegR - r.legR.rotation.x) * k;
     if (r.body) {
       const bob = (moving && !dead) ? Math.abs(Math.sin(inst.walkPhase)) * 0.07 : 0;
-      r.body.position.y += (bob - r.body.position.y) * k;
+      r.body.position.y += ((emote && !dead ? tBodyY : bob) - r.body.position.y) * k;
+      r.body.rotation.x += (tBodyRX - r.body.rotation.x) * k;
       // mobs have no pivoted legs: rock the body a touch instead
       if (!r.armL) r.body.rotation.x = (moving && !dead) ? Math.sin(inst.walkPhase) * 0.05 : 0;
     }
@@ -538,27 +698,34 @@ export function initWorld(canvas, net) {
       seen.add(ent.id);
       const sub = ent.kind === 'player' ? (ent.cls || 'warrior') : (ent.mob || 'boar');
       let rec = models.get(ent.id);
+      const tint = ent.kind === 'pet' ? 0xd4a017 : 0; // golden tint marks tamed beasts
       if (!rec) {
-        rec = { inst: instantiate(ent.kind, sub), sub, kind: ent.kind };
+        rec = { inst: instantiate(ent.kind, sub, tint), sub, kind: ent.kind };
         rec.inst.group.userData.entId = ent.id;
+        if (ent.kind === 'player') applyAppearance(rec.inst, ent.appearance);
         scene.add(rec.inst.group);
         models.set(ent.id, rec);
       } else if (rec.sub !== sub || rec.kind !== ent.kind) {
         scene.remove(rec.inst.group);
-        rec.inst = instantiate(ent.kind, sub);
+        rec.inst = instantiate(ent.kind, sub, tint);
         rec.inst.group.userData.entId = ent.id;
+        if (ent.kind === 'player') applyAppearance(rec.inst, ent.appearance);
         scene.add(rec.inst.group);
         rec.sub = sub; rec.kind = ent.kind;
+      } else if (ent.kind === 'player' && ent.appearance &&
+                 rec.inst.group.userData.appSig !== appSig(sanitizeApp(ent.appearance))) {
+        applyAppearance(rec.inst, ent.appearance); // appearance changed: re-apply
       }
       const inst = rec.inst;
       const px = ent._px ?? ent.x, pz = ent._pz ?? ent.z;
       const alpha = Math.min(1, Math.max(0, (now - (ent._pt || now)) / 100));
       inst.rx = px + (ent.x - px) * alpha;
       inst.rz = pz + (ent.z - pz) * alpha;
-      inst.group.position.set(inst.rx, inst.tipped ? -0.35 : 0, inst.rz);
-      inst.group.rotation.y = lerpAngle(inst.group.rotation.y, ent.heading || 0, Math.min(1, dt * 10));
+      inst.group.position.set(inst.rx, (inst.tipped ? -0.35 : 0) + (ent.y || 0), inst.rz);
+      inst.group.rotation.y = lerpAngle(inst.group.rotation.y, ent.heading || 0, Math.min(1, dt * 10)) + (inst.emoteSpin || 0);
       setDead(inst, !!ent.dead);
-      animateRig(rec, !!ent.moving, !!ent.dead, dt);
+      animateRig(rec, !!ent.moving, !!ent.dead, dt, ent.emote || null);
+      zzzTick(inst, ent.id, ent.emote || null, dt);
     }
     for (const [id, rec] of models) {
       if (!seen.has(id)) { scene.remove(rec.inst.group); models.delete(id); }
@@ -570,6 +737,7 @@ export function initWorld(canvas, net) {
     if (!me) return;
     if (!local.inst) {
       local.inst = instantiate('player', me.cls || 'warrior');
+      applyAppearance(local.inst, me.appearance);
       local.inst.group.userData.entId = me.id;
       scene.add(local.inst.group);
       local.lx = me.x; local.lz = me.z; local.init = true;
@@ -577,10 +745,11 @@ export function initWorld(canvas, net) {
     const g = local.inst.group;
     const moved = Math.hypot(me.x - local.lx, me.z - local.lz);
     local.lx = me.x; local.lz = me.z;
-    g.position.set(me.x, local.inst.tipped ? -0.35 : 0, me.z);
-    g.rotation.y = me.heading || 0; // client-predicted; no smoothing needed
+    g.position.set(me.x, (local.inst.tipped ? -0.35 : 0) + (me.y || 0), me.z);
+    g.rotation.y = (me.heading || 0) + (local.inst.emoteSpin || 0); // client-predicted; no smoothing needed
     setDead(local.inst, !!me.dead);
-    animateRig(local, moved > 0.02, !!me.dead, dt);
+    animateRig(local, moved > 0.02, !!me.dead, dt, me.emote || null);
+    zzzTick(local.inst, me.id, me.emote || null, dt);
   }
 
   // ---- nameplates
@@ -594,7 +763,7 @@ export function initWorld(canvas, net) {
         if (!rec) continue;
         const dx = rec.inst.rx - me.x, dz = rec.inst.rz - me.z;
         if (dx * dx + dz * dz > 45 * 45) continue;
-        const headY = ent.kind === 'player' ? 2.15 : 1.35;
+        const headY = (ent.kind === 'player' ? 2.15 : 1.35) + (ent.y || 0);
         const s = screenOf(rec.inst.rx, headY, rec.inst.rz);
         if (!s) continue;
         const [sx, sy] = s;
@@ -603,12 +772,22 @@ export function initWorld(canvas, net) {
         const p = plates[pi++];
         p.used = true;
         const elite = ent.kind === 'mob' && (ent.elite || ent.mob === 'alpha');
-        const sig = ent.name + '|' + ent.level + '|' + elite + '|' + ent.kind + '|' +
-                    (ent.casting ? ent.casting.label : '');
+        const isGM = ent.kind === 'player' && !!ent.gm;
+        const isPet = ent.kind === 'pet';
+        const gname = ent.kind === 'player' ? (ent.guild || '') : '';
+        const isAfk = ent.kind === 'player' && !!ent.afk;
+        const sig = ent.name + '|' + ent.level + '|' + elite + '|' + ent.kind + '|' + isGM + '|' + gname + '|' +
+                    (ent.ownerName || '') + '|' + (ent.casting ? ent.casting.label : '') + '|' + isAfk + '|' + (ent.afkMsg || '');
         if (p.sig !== sig) {
           p.sig = sig;
-          p.name.textContent = (elite ? '★ ' : '') + ent.name + '  ' + (ent.level || 1);
-          p.fill.style.background = ent.kind === 'player' ? '#5f5' : elite ? '#fa0' : '#f55';
+          // WoW-style: <GM>Name in gold, guild name in smaller text underneath;
+          // tamed pets show "<Owner>'s Pet". AFK players get a grey <AFK> tag.
+          p.name.textContent = isPet ? `${ent.ownerName}'s Pet`
+            : (elite ? '★ ' : '') + (isGM ? '<GM>' : '') + ent.name + '  ' + (ent.level || 1) + (isAfk ? ' <AFK>' : '');
+          p.name.style.color = isGM ? '#ffd75e' : isAfk ? '#9a9a9a' : '';
+          p.name.title = isAfk ? (ent.afkMsg || 'Away from keyboard') : '';
+          p.guild.textContent = gname;
+          p.fill.style.background = isPet ? '#8fd694' : isGM ? '#ffd75e' : ent.kind === 'player' ? '#5f5' : elite ? '#fa0' : '#f55';
         }
         const frac = (ent.hp != null && ent.maxHp) ? Math.max(0, Math.min(1, ent.hp / ent.maxHp)) : 1;
         p.fill.style.width = (frac * 100).toFixed(1) + '%';
@@ -623,6 +802,30 @@ export function initWorld(canvas, net) {
   }
 
   // ---- FX updates
+  // "Zzz" float above a sleeping character's head (pooled, like damage numbers)
+  function zzzTick(inst, id, emote, dt) {
+    if (emote === 'sleep') {
+      inst._zzzT = (inst._zzzT || 0) + dt;
+      if (inst._zzzT > 1.5) {
+        inst._zzzT = 0;
+        const hp = headPosOf(id);
+        const s = hp ? screenOf(hp.x, hp.y, hp.z) : null;
+        if (s) floatDmg(s[0] + 8, s[1] - 10, 'Z', '#9fd8ff', 18);
+      }
+    } else inst._zzzT = 0;
+  }
+  // shared float-text spawner (damage numbers + emote Zzz)
+  function floatDmg(x, y, text, color, size) {
+    let d = dmgPool.find(p => !p.active);
+    if (!d) { d = dmgPool[0]; } // steal oldest slot when saturated
+    d.active = true; d.t = 0;
+    d.x = x + (Math.random() * 16 - 8);
+    d.y = y;
+    d.el.textContent = text;
+    d.el.style.display = 'block';
+    d.el.style.color = color;
+    d.el.style.fontSize = size + 'px';
+  }
   function updateDmg(dt) {
     for (const d of dmgPool) {
       if (!d.active) continue;
@@ -750,7 +953,14 @@ export function initWorld(canvas, net) {
       net.target(id);
     },
     fx: {
-      damage(id, amount, crit, label, srcId) {
+      // floating text over an entity (damage numbers use this too via fx.damage)
+      floatText(id, text, color = '#fff', size = 15) {
+        if (!renderer) return;
+        const hp = headPosOf(id);
+        const s = hp ? screenOf(hp.x, hp.y, hp.z) : null;
+        if (s) floatDmg(s[0], s[1] - 6, text, color, size);
+      },
+      damage(id, amount, crit, label, srcId, roll) {
         if (!renderer) return;
         const hp = headPosOf(id);
         const s = hp ? screenOf(hp.x, hp.y, hp.z) : null;
@@ -761,19 +971,21 @@ export function initWorld(canvas, net) {
           d.x = s[0] + (Math.random() * 24 - 12);
           d.y = s[1] - 6;
           const el = d.el;
-          el.textContent = (crit ? Math.round(amount) + '!' : Math.round(amount));
-          let color = '#fff', size = 15;
-          if (label === 'heal') { color = '#5f5'; size = 14; }
+          let color = '#fff', size = 15, text = String(Math.round(amount));
+          if (roll === 'dodge') { text = 'DODGED'; color = '#c9c9c9'; size = 14; }
+          else if (roll === 'parry') { text = 'PARRIED'; color = '#9fd8ff'; size = 14; }
+          else if (crit || roll === 'crit') { text = Math.round(amount) + '!'; color = '#ffd34d'; size = 21; }
+          else if (label === 'heal') { color = '#5f5'; size = 14; }
           else if (state.me && id === state.me.id) { color = '#ff5b5b'; size = 14; }
-          else if (crit) { color = '#ffd34d'; size = 21; }
+          el.textContent = text;
           el.style.display = 'block';
           el.style.color = color;
           el.style.fontSize = size + 'px';
           el.style.opacity = '1';
         }
-        // hit flinch on the victim
+        // hit flinch on the victim (not on a clean dodge)
         const victim = recOf(id);
-        if (victim) victim.inst.flinch = 1;
+        if (victim && roll !== 'dodge') victim.inst.flinch = 1;
         // attacker faces its target (cheap attack read)
         if (srcId != null && srcId !== id) {
           const a = recOf(srcId), b = recOf(id);
@@ -820,4 +1032,48 @@ export function initWorld(canvas, net) {
   };
 
   return api;
+}
+
+// ---------------------------------------------------------------- creation-screen preview
+// Cheap live 3D preview for the login screen: own tiny scene, one character,
+// slow turntable. Call dispose() once the player enters the world.
+export function createPreview(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x3a2f22, 1.0));
+  const dir = new THREE.DirectionalLight(0xffe0b3, 1.2);
+  dir.position.set(2, 4, 3);
+  scene.add(dir);
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
+  camera.position.set(0.4, 1.55, 4.4);
+  camera.lookAt(0, 1.05, 0);
+  let inst = null, raf = 0, alive = true;
+  function resize() {
+    const w = canvas.clientWidth || 240, h = canvas.clientHeight || 320;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  function set(cls, app) {
+    if (inst) scene.remove(inst.group);
+    inst = instantiate('player', cls);
+    applyAppearance(inst, app);
+    scene.add(inst.group);
+    resize();
+  }
+  function frame() {
+    if (!alive) return;
+    try {
+      if (inst) inst.group.rotation.y += 0.01;
+      renderer.render(scene, camera);
+    } catch (e) { /* preview must never break the login screen */ }
+    raf = requestAnimationFrame(frame);
+  }
+  resize();
+  frame();
+  return {
+    set, resize,
+    dispose() { alive = false; cancelAnimationFrame(raf); renderer.dispose(); },
+  };
 }

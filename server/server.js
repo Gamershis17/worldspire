@@ -11,8 +11,9 @@ const app = express();
 app.use(express.static('public'));
 app.get('/api/health', (req, res) => res.json({ ok: true, players: game.players.size }));
 
-const server = app.listen(PORT, () => console.log(`[worldspire] listening on :${PORT}`));
 const game = new Game(store);
+await game.init(); // load persisted guilds before accepting connections
+const server = app.listen(PORT, () => console.log(`[worldspire] listening on :${PORT}`));
 
 const wss = new WebSocketServer({ server, path: '/ws' });
 wss.on('connection', (ws) => {
@@ -26,7 +27,7 @@ wss.on('connection', (ws) => {
       if (d.op === 'login') {
         loggedIn = true;
         clearTimeout(loginTimer);
-        const p = await game.login(ws, d.name, d.cls);
+        const p = await game.login(ws, d.name, d.cls, d.appearance);
         if (!p) { loggedIn = false; ws.close(); }
       }
       return;

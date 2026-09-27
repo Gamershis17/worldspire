@@ -6,9 +6,9 @@ import { initUI } from './ui.js';
 
 // world3d is written by a second agent; import defensively so a missing or
 // broken world3d.js never breaks the login screen or the ws handshake.
-let initWorld = null;
+let initWorld = null, APPEARANCE_UI = null, createPreview = null;
 try {
-  ({ initWorld } = await import('./world3d.js'));
+  ({ initWorld, APPEARANCE_UI, createPreview } = await import('./world3d.js'));
 } catch (e) {
   console.error('[boot] world3d failed to load:', e);
 }
@@ -20,6 +20,9 @@ let world = null;
 let ui = null;
 let selectedCls = 'warrior';
 let autoOn = false;
+// character-creation appearance (indices into APPEARANCE_UI palettes)
+let appearance = { skin: 1, face: 0, hairStyle: 1, hairColor: 1 };
+let preview = null;
 const keys = {};
 let lastMoveSent = 0;
 let lastDir = { x: 0, z: 0 };
@@ -37,8 +40,72 @@ document.querySelectorAll('.class-card').forEach((card) => {
     document.querySelectorAll('.class-card').forEach((c) => c.classList.remove('selected'));
     card.classList.add('selected');
     selectedCls = card.dataset.cls;
+    refreshPreview();
   });
 });
+
+// ---------- appearance customization ----------
+const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+function refreshPreview() {
+  if (preview) { try { preview.set(selectedCls, appearance); } catch (e) { /* never break login */ } }
+}
+function markSelected(el, idx) {
+  el.querySelectorAll('[data-i]').forEach((b) => b.classList.toggle('selected', +b.dataset.i === idx));
+}
+function buildAppearanceUI() {
+  if (!APPEARANCE_UI || !createPreview) return; // 3D unavailable: skip appearance UI
+  const AP = APPEARANCE_UI;
+  const skinsEl = $('ap-skins'), hairEl = $('ap-haircolors');
+  AP.skins.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'swatch'; b.dataset.i = i;
+    b.title = AP.skinNames[i]; b.style.background = hex(c);
+    b.setAttribute('aria-label', 'Skin: ' + AP.skinNames[i]);
+    b.addEventListener('click', () => { appearance.skin = i; markSelected(skinsEl, i); refreshPreview(); });
+    skinsEl.appendChild(b);
+  });
+  AP.hairColors.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'swatch'; b.dataset.i = i;
+    b.title = AP.hairColorNames[i]; b.style.background = hex(c);
+    b.setAttribute('aria-label', 'Hair color: ' + AP.hairColorNames[i]);
+    b.addEventListener('click', () => { appearance.hairColor = i; markSelected(hairEl, i); refreshPreview(); });
+    hairEl.appendChild(b);
+  });
+  const facesEl = $('ap-faces'), hairsEl = $('ap-hairs');
+  AP.faceNames.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ap-btn'; b.dataset.i = i; b.textContent = n;
+    b.addEventListener('click', () => { appearance.face = i; markSelected(facesEl, i); refreshPreview(); });
+    facesEl.appendChild(b);
+  });
+  AP.hairStyleNames.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ap-btn'; b.dataset.i = i; b.textContent = n;
+    b.addEventListener('click', () => { appearance.hairStyle = i; markSelected(hairsEl, i); refreshPreview(); });
+    hairsEl.appendChild(b);
+  });
+  const rnd = (n) => Math.floor(Math.random() * n);
+  $('ap-random').addEventListener('click', () => {
+    appearance = {
+      skin: rnd(AP.skins.length), face: rnd(AP.faceNames.length),
+      hairStyle: rnd(AP.hairStyleNames.length), hairColor: rnd(AP.hairColors.length),
+    };
+    markSelected(skinsEl, appearance.skin); markSelected(hairEl, appearance.hairColor);
+    markSelected(facesEl, appearance.face); markSelected(hairsEl, appearance.hairStyle);
+    refreshPreview();
+  });
+  markSelected(skinsEl, appearance.skin); markSelected(hairEl, appearance.hairColor);
+  markSelected(facesEl, appearance.face); markSelected(hairsEl, appearance.hairStyle);
+  try {
+    preview = createPreview($('char-preview'));
+    refreshPreview();
+  } catch (e) {
+    console.error('[boot] preview failed:', e);
+    preview = null;
+  }
+}
+buildAppearanceUI();
 
 function tryLogin() {
   const name = $('login-name').value.trim();
@@ -51,16 +118,18 @@ function tryLogin() {
     return;
   }
   $('login-err').textContent = '';
-  net.login(name, selectedCls);
+  net.login(name, selectedCls, appearance);
 }
 $('login-btn').addEventListener('click', tryLogin);
 $('login-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
 
 // ---------- net wiring ----------
 // WS endpoint: ?ws= override, else same-host, else localhost dev fallback
-// (file:// testing has no host).
+// (file:// testing has no host). Scheme follows the page protocol so the
+// HTTPS live site uses wss:// (browsers block ws:// as mixed content).
 const _wsParam = new URLSearchParams(location.search).get('ws');
-const WS_URL = _wsParam || (location.host ? 'ws://' + location.host + '/ws' : 'ws://localhost:3001/ws');
+const _wsScheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+const WS_URL = _wsParam || (location.host ? _wsScheme + location.host + '/ws' : 'ws://localhost:3001/ws');
 net.connect(WS_URL).catch(() => {
   $('login-err').textContent = 'Could not reach the game server. Is it running?';
 });
@@ -68,6 +137,7 @@ net.connect(WS_URL).catch(() => {
 net.onHello = (me) => {
   $('login').classList.add('hidden');
   $('hud').classList.remove('hidden');
+  if (preview) { try { preview.dispose(); } catch (e) {} preview = null; }
   if (initWorld) {
     try {
       world = initWorld(canvas, net);
@@ -101,12 +171,12 @@ net.onEvent = (ev) => {
   if (!world && !ui) return;
   const fx = world ? world.fx : null;
   switch (ev.ev) {
-    case 'dmg': if (fx) fx.damage(ev.dst, ev.amount, ev.crit, ev.label, ev.src); break;
+    case 'dmg': if (fx) fx.damage(ev.dst, ev.amount, ev.crit, ev.label, ev.src, ev.roll); break;
     case 'proj': if (fx) fx.projectile(ev.src, ev.dst, ev.kind); break;
     case 'die': if (fx) fx.die(ev.id); break;
     case 'lvlup':
       if (fx) fx.levelUp();
-      if (ui) ui.toast(`Level ${ev.level}! Power grows.`);
+      if (ui) { ui.toast(`Level ${ev.level}! Power grows.`); ui.xpFlash(); }
       break;
     case 'kill':
       if (ui) ui.toast(`+${ev.xp || 0} XP · +${ev.coins || 0} 🪙`);
@@ -114,6 +184,12 @@ net.onEvent = (ev) => {
     case 'buff': if (ui) ui.toast(ev.label || 'Buff'); break;
     case 'respawn': if (ui) ui.toast('Respawned at the village.'); break;
     case 'leash': break; // cosmetic-only, no toast spam
+    case 'ach':
+      if (ui) ui.toast(`🏆 Achievement Earned: ${ev.name} (+${ev.points} pts)`);
+      break; // system chat line arrives separately from the server
+    case 'cdclear':
+      if (ui) ui.clearCooldowns();
+      break;
     default: break; // chat is applied to state by net.js; ui polls it
   }
 };
@@ -162,10 +238,17 @@ window.addEventListener('keydown', (e) => {
   }
   if (loginVisible() || isTyping() || !state.me) return;
   keys[e.code] = true;
+  if (e.code === 'Space' && state.me.fly) e.preventDefault(); // fly: don't scroll the page
+  if (e.code === 'KeyY' && ui) { ui.toggleAch(); return; } // achievements panel
   const slot = SLOT_KEYS[e.code];
   if (slot && !state.me.dead && ui) {
-    net.cast(slot);
     const ab = (state.me.abilities || []).find((a) => a.slot === slot);
+    // Level-locked abilities (e.g. Tame Beast) stay greyed until unlocked; server enforces too.
+    if (ab && ab.levelReq && (state.me.level || 1) < ab.levelReq) {
+      ui.toast(`${ab.name} unlocks at level ${ab.levelReq}.`);
+      return;
+    }
+    net.cast(slot);
     // Optimistic cooldown; skip it when we know mana is short (server will err → toast).
     if (!ab || (state.me.mp || 0) >= (ab.mana || 0)) ui.startCooldown(slot);
   }
@@ -215,11 +298,21 @@ function stepMovement(dt) {
   me.x = nx; me.z = nz;
   me.heading = yaw; // WoW-style: character faces the camera direction
 
+  // Free-flight (GM): Space ascends, C descends. Server clamps/validates.
+  let iy = 0;
+  if (canMove && me.fly) {
+    if (keys.Space) iy += 1;
+    if (keys.KeyC) iy -= 1;
+  }
+  const ny = Math.max(0, Math.min(30, (me.y || 0) + iy * 8 * dt));
+  const yChanged = Math.abs(ny - (me.y || 0)) > 1e-4;
+  me.y = ny;
+
   // Send at 10 Hz while moving, or immediately on direction change (incl. stop).
   const now = performance.now();
-  const changed = wx !== lastDir.x || wz !== lastDir.z;
+  const changed = wx !== lastDir.x || wz !== lastDir.z || yChanged;
   if (changed || (len > 0 && now - lastMoveSent >= 100)) {
-    net.move(+wx.toFixed(3), +wz.toFixed(3), +yaw.toFixed(3));
+    net.move(+wx.toFixed(3), +wz.toFixed(3), +yaw.toFixed(3), +me.y.toFixed(2));
     lastMoveSent = now;
     lastDir = { x: wx, z: wz };
   }
@@ -229,6 +322,7 @@ function stepMovement(dt) {
   if (snap) {
     const drift = Math.hypot(snap.x - me.x, snap.z - me.z);
     if (drift > 1.5) { me.x = snap.x; me.z = snap.z; }
+    if (Math.abs((snap.y || 0) - me.y) > 2) me.y = snap.y || 0;
   }
 }
 
@@ -245,4 +339,4 @@ function loop(t) {
 }
 
 // Validation hook (harmless in production): lets headless tests drive the client.
-window.WS_DEBUG = { state, net, get world() { return world; }, get ui() { return ui; } };
+window.WS_DEBUG = { state, net, get world() { return world; }, get ui() { return ui; }, wsUrl: WS_URL };

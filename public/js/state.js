@@ -33,7 +33,7 @@ export function removeEnt(id) { state.ents.delete(id); }
 
 export function targetEnt() { return state.targetId != null ? state.ents.get(state.targetId) || null : null; }
 
-export function pushChat(from, text, sys) {
-  state.chat.push({ from, text, sys: !!sys });
+export function pushChat(from, text, sys, gm, guild, emote) {
+  state.chat.push({ from, text, sys: !!sys, gm: !!gm, guild: !!guild, emote: !!emote });
   if (state.chat.length > 120) state.chat.shift();
 }

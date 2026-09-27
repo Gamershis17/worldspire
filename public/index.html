@@ -49,6 +49,17 @@
         </div>
       </div>
     </div>
+    <div class="create-row">
+      <div class="appearance-panel">
+        <h2 class="ap-title">Appearance</h2>
+        <div class="ap-group"><label>Skin</label><div class="swatches" id="ap-skins"></div></div>
+        <div class="ap-group"><label>Hair</label><div class="swatches" id="ap-haircolors"></div></div>
+        <div class="ap-group"><label>Face</label><div class="ap-btns" id="ap-faces"></div></div>
+        <div class="ap-group"><label>Hairstyle</label><div class="ap-btns" id="ap-hairs"></div></div>
+        <button id="ap-random" type="button">🎲 Randomize</button>
+      </div>
+      <div class="preview-wrap"><canvas id="char-preview"></canvas></div>
+    </div>
     <button id="login-btn">ENTER WORLD</button>
     <div id="login-err"></div>
     <p class="login-hint">WASD to move · 1–4 abilities · Tab target · Click enemy to attack</p>
@@ -57,20 +68,49 @@
 
 <!-- ============ HUD ============ -->
 <div id="hud" class="hidden">
-  <div id="player-frame" class="frame">
-    <div class="pf-head"><span id="pf-name">—</span><span id="pf-level">1</span></div>
-    <div id="hp-bar" class="bar"><div id="hp-fill"></div><span id="hp-text" class="bar-text">—</span></div>
-    <div id="mp-bar" class="bar"><div id="mp-fill"></div><span id="mp-text" class="bar-text">—</span></div>
+  <div id="player-frame" class="frame unitframe">
+    <div class="uf-medal" id="pf-medal"><span class="uf-lvl" id="pf-level">1</span></div>
+    <div class="uf-main">
+      <div class="uf-name" id="pf-name">—</div>
+      <div id="hp-bar" class="bar"><div id="hp-fill"></div><span id="hp-text" class="bar-text">—</span></div>
+      <div id="mp-bar" class="bar"><div id="mp-fill"></div><span id="mp-text" class="bar-text">—</span></div>
+      <div id="pf-buffs" class="uf-buffs"></div>
+    </div>
   </div>
 
-  <div id="target-frame" class="frame hidden">
-    <div class="pf-head"><span id="tf-name">—</span><span id="tf-level">?</span></div>
-    <div id="tf-hp-bar" class="bar"><div id="tf-hp-fill"></div><span id="tf-hp-text" class="bar-text">—</span></div>
+  <div id="target-frame" class="frame unitframe hidden">
+    <div class="uf-medal" id="tf-medal"><span class="uf-lvl" id="tf-level">?</span></div>
+    <div class="uf-main">
+      <div class="uf-name" id="tf-name">—</div>
+      <div id="tf-hp-bar" class="bar"><div id="tf-hp-fill"></div><span id="tf-hp-text" class="bar-text">—</span></div>
+      <div id="tf-debuffs" class="uf-buffs"></div>
+    </div>
+  </div>
+
+  <div id="pet-frame" class="frame unitframe hidden">
+    <div class="uf-medal small" id="pet-medal">🐾</div>
+    <div class="uf-main">
+      <div class="uf-name" id="pet-name">—</div>
+      <div id="pet-hp-bar" class="bar"><div id="pet-hp-fill"></div><span id="pet-hp-text" class="bar-text">—</span></div>
+    </div>
   </div>
 
   <div id="top-right">
     <div id="coins" title="Coins">🪙 0</div>
+    <button id="char-btn" title="Character stats">👤</button>
+    <button id="ach-btn" title="Achievements (Y)">🏆</button>
     <button id="settings-btn" title="Settings">⚙</button>
+  </div>
+
+  <div id="ach-panel" class="frame hidden">
+    <h3>Achievements <span id="ach-points" class="note">0 pts</span></h3>
+    <div id="ach-tabs"></div>
+    <div id="ach-list"></div>
+  </div>
+
+  <div id="char-panel" class="frame hidden">
+    <h3>Character</h3>
+    <div id="char-stats" class="note">—</div>
   </div>
 
   <div id="settings-panel" class="hidden">
@@ -83,6 +123,8 @@
       </select>
     </label>
     <p class="note">Anti-aliasing changes apply after reload.</p>
+    <h3>Equipment</h3>
+    <div id="gear-line" class="note">Weapon: — · Armor: —</div>
   </div>
 
   <div id="err-toast" class="hidden"></div>
